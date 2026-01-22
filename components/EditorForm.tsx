@@ -16,6 +16,18 @@ const EditorForm: React.FC<EditorFormProps> = ({ data, onChange, onPrintTrigger,
   
   const [selectedField, setSelectedField] = useState('hall');
 
+  // 影片名称记忆逻辑：从本地存储加载，默认为空或初始列表
+  const [movieList, setMovieList] = useState<string[]>(() => {
+    const saved = localStorage.getItem('movie_history');
+    return saved ? JSON.parse(saved) : [
+      "哪吒之魔童闹海",
+      "封神第二部：战火西岐",
+      "唐探1900",
+      "熊出没·逆转时空",
+      "飞驰人生2"
+    ];
+  });
+
   const fieldOptions = [
     { id: 'brand', name: '品牌行 (来安...)' },
     { id: 'hall', name: '主券-影厅' },
@@ -35,10 +47,40 @@ const EditorForm: React.FC<EditorFormProps> = ({ data, onChange, onPrintTrigger,
     { id: 'stubPrice', name: '副券-票价' },
   ];
 
+  // 持久化存储影片列表
   useEffect(() => {
-    const currentSeatMatch = data.seat.match(/(.*?)排(.*?)座/);
-    if (!currentSeatMatch && data.seat === '') {
-      setRow(''); setCol('');
+    localStorage.setItem('movie_history', JSON.stringify(movieList));
+  }, [movieList]);
+
+  // 监听打印触发或失焦，将新影片加入记忆
+  const recordMovie = (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    
+    setMovieList(prev => {
+      // 如果已存在，先移除旧的，再放到最后（更新活跃度）或者保持原位
+      // 这里按用户要求：输入第11个顶掉第一个，实现 FIFO
+      if (prev.includes(trimmed)) return prev;
+      
+      const newList = [...prev, trimmed];
+      if (newList.length > 10) {
+        return newList.slice(1); // 删掉第一个，保留后10个
+      }
+      return newList;
+    });
+  };
+
+  // 同步清空逻辑
+  useEffect(() => {
+    if (!data.seat) {
+      setRow('');
+      setCol('');
+    } else {
+      const match = data.seat.match(/(.*?)排(.*?)座/);
+      if (match) {
+        setRow(match[1]);
+        setCol(match[2]);
+      }
     }
   }, [data.seat]);
 
@@ -65,7 +107,10 @@ const EditorForm: React.FC<EditorFormProps> = ({ data, onChange, onPrintTrigger,
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && onPrintTrigger) onPrintTrigger();
+    if (e.key === 'Enter') {
+      recordMovie(data.movieName);
+      if (onPrintTrigger) onPrintTrigger();
+    }
   };
 
   return (
@@ -178,16 +223,38 @@ const EditorForm: React.FC<EditorFormProps> = ({ data, onChange, onPrintTrigger,
         </div>
       </div>
 
+      {/* 影片名称：记忆功能实现 */}
       <div>
-        <label className="block text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5">影片名称</label>
-        <input
-          type="text"
-          name="movieName"
-          value={data.movieName}
-          onChange={handleChange}
-          onKeyDown={handleKeyDown}
-          className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-red-500 font-bold"
-        />
+        <label className="block text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5 flex justify-between">
+          <span>影片名称</span>
+          <span className="text-[9px] text-slate-400">已记忆 {movieList.length}/10</span>
+        </label>
+        <div className="space-y-2">
+          <select
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-red-500 font-bold"
+            onChange={(e) => {
+              if (e.target.value) {
+                onChange({ ...data, movieName: e.target.value });
+              }
+            }}
+            value={movieList.includes(data.movieName) ? data.movieName : ""}
+          >
+            <option value="">-- 选择历史记忆 --</option>
+            {movieList.map((movie, index) => (
+              <option key={index} value={movie}>{movie}</option>
+            ))}
+          </select>
+          <input
+            type="text"
+            name="movieName"
+            value={data.movieName}
+            onChange={handleChange}
+            onBlur={() => recordMovie(data.movieName)} // 离开输入框时尝试记录
+            onKeyDown={handleKeyDown}
+            placeholder="输入新片名 (自动记忆)"
+            className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm outline-none focus:ring-2 focus:ring-red-500 font-black"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

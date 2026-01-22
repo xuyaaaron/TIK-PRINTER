@@ -33,8 +33,8 @@ const App: React.FC = () => {
     cinema: '加州环球影城',
     date: new Date().toISOString().split('T')[0],
     time: '20:00',
-    movieName: '影片1',
-    seat: '6排8座',
+    movieName: '',
+    seat: '',
     price: '50.00',
     serviceFee1: '0.00',
     serviceFee2: '0.00',
@@ -56,9 +56,12 @@ const App: React.FC = () => {
 
   const handlePrint = () => {
     window.print();
+    // 打印完以后自动清空关键信息，方便下一张录入
     setTicketData(prev => ({ 
       ...prev, 
-      ticketId: generateRandomTicketId() 
+      ticketId: generateRandomTicketId(),
+      seat: '',       // 清空座号（排/座）
+      movieName: '',  // 清空影片名称
     }));
   };
 
